@@ -18,7 +18,7 @@ class UploadCoroutineTask(
     override suspend fun handle(element: File): Result = try {
         storage.upload(element)
     } catch (e: IOException) {
-        Result.Retry(3)
+        Result.retry(3)
     } catch (e: Exception) {
         Result.Failure(e)
     }
