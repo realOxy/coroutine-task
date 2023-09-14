@@ -43,7 +43,8 @@ abstract class AbstractCoroutineTask<E>(
         val job = launch {
             while (!cancelled) {
                 val histories = flow.value
-                val handleable = pull().filterHandleable(histories)
+                val all = pull()
+                val handleable = filterHandleable(all, histories)
 
                 handleable.forEachIndexed { i, e ->
                     if (cancelled) return@launch
@@ -87,10 +88,13 @@ abstract class AbstractCoroutineTask<E>(
         status = Status.Executing(job)
     }
 
-    private fun List<E>.filterHandleable(histories: Histories<E>): List<E> = filter {
+    internal open fun filterHandleable(
+        all: List<E>,
+        histories: Histories<E>
+    ): List<E> = all.filter {
         val result = histories[it]
         result == null || result is Result.Idle || result is Result.Retry
     }
 }
 
-private typealias Histories<E> = Map<E, CoroutineTask.Result>
+internal typealias Histories<E> = Map<E, CoroutineTask.Result>

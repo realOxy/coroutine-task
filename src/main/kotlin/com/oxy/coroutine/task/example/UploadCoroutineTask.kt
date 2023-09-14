@@ -1,6 +1,6 @@
 package com.oxy.coroutine.task.example
 
-import com.oxy.coroutine.task.AbstractCoroutineTask
+import com.oxy.coroutine.task.PrioritizeCoroutineTask
 import com.oxy.coroutine.task.tryCancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -11,7 +11,7 @@ import java.io.IOException
 internal class UploadCoroutineTask(
     private val source: FileDataSource,
     private val storage: FileStorage,
-) : AbstractCoroutineTask<MockFile>() {
+) : PrioritizeCoroutineTask<MockFile>() {
     override suspend fun pull(): List<MockFile> = try {
         source.pull()
     } catch (e: Exception) {
