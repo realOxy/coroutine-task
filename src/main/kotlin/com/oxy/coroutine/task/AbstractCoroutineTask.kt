@@ -1,69 +1,27 @@
 package com.oxy.coroutine.task
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Provides a skeletal implementation of [CoroutineTask] abstract class.
+ */
 abstract class AbstractCoroutineTask<E>(
     pullInterval: Duration = 1.seconds,
     handleInterval: Duration = 1.seconds,
-    dispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
-) : CoroutineTask<E>(pullInterval, handleInterval, dispatcher) {
+) : CoroutineTask<E>(pullInterval, handleInterval) {
 
-    private val histories: MutableStateFlow<Map<E, History<E>>> = MutableStateFlow(emptyMap())
+    private val flow: MutableStateFlow<Histories<E>> = MutableStateFlow(emptyMap())
 
-    override suspend fun run(): Unit = coroutineScope {
-        val job = launch(dispatcher) {
-            while (!cancelled) {
-                val cache = histories.value
-                val merged = pull().mergeCache(cache)
-
-                merged.forEachIndexed { i, e ->
-                    if (cancelled) return@launch
-                    var result = handle(e)
-                    if (result == Result.Retry) {
-                        histories.update {
-                            it.toMutableMap().apply {
-                                this[e] = cache.getOrDefault(e, History(e)).copy(
-                                    result = Result.Retry
-                                )
-                            }
-                        }
-                        while (result == Result.Retry) {
-                            delay(handleInterval)
-                            result = handle(e)
-                        }
-                    }
-
-                    histories.update {
-                        it.toMutableMap().apply {
-                            this[e] = cache.getOrDefault(e, History(e)).copy(
-                                result = result
-                            )
-                        }
-                    }
-
-                    if (i != merged.lastIndex) {
-                        delay(handleInterval)
-                    }
-                }
-                delay(pullInterval)
-            }
-        }
-        status = Status.Executing(job)
-    }
-
-    private fun List<E>.mergeCache(cache: Map<E, History<E>>): List<E> {
-        val result = this.toMutableList()
-        return result.filter {
-            val history = cache[it]
-            history == null || history.value is Result.Idle || history.value is Result.Retry
-        }
-    }
+    override suspend fun run() = runImpl()
 
     override fun cancel(cause: CancellationException?) {
         synchronized(status) {
@@ -79,5 +37,60 @@ abstract class AbstractCoroutineTask<E>(
         }
     }
 
-    override fun histories(): Flow<List<History<E>>> = histories.map { it.values.toList() }
+    override fun history(): Flow<Collection<Result>> = flow.map { it.values }
+
+    private suspend fun runImpl() = coroutineScope {
+        val job = launch {
+            while (!cancelled) {
+                val histories = flow.value
+                val handleable = pull().filterHandleable(histories)
+
+                handleable.forEachIndexed { i, e ->
+                    if (cancelled) return@launch
+                    var result = handle(e)
+                    if (result is Result.Retry) {
+                        flow.update {
+                            it.toMutableMap().apply {
+                                this[e] = result
+                            }
+                        }
+                        var time = 0
+                        while (result is Result.Retry && time < result.limit) {
+                            time++
+                            val extraInterval = when (val strategy = result.strategy) {
+                                Result.DelayStrategy.Stable -> Duration.ZERO
+                                is Result.DelayStrategy.LinearUniform -> strategy.increment * time
+                            }
+                            delay(handleInterval + extraInterval)
+                            result = handle(e)
+                        }
+
+                        if (result is Result.Retry) {
+                            result = Result.Failure(RetryOutOfLimitException())
+                        }
+                    }
+
+                    flow.update {
+                        it.toMutableMap().apply {
+                            this[e] = result
+                        }
+                    }
+
+                    if (i != handleable.lastIndex) {
+                        delay(handleInterval)
+                    }
+                }
+                delay(pullInterval)
+            }
+            onCompleted()
+        }
+        status = Status.Executing(job)
+    }
+
+    private fun List<E>.filterHandleable(histories: Histories<E>): List<E> = filter {
+        val result = histories[it]
+        result == null || result is Result.Idle || result is Result.Retry
+    }
 }
+
+private typealias Histories<E> = Map<E, CoroutineTask.Result>

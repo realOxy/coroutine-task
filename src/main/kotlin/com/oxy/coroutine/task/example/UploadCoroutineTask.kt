@@ -1,6 +1,7 @@
 package com.oxy.coroutine.task.example
 
 import com.oxy.coroutine.task.AbstractCoroutineTask
+import com.oxy.coroutine.task.tryCancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -8,27 +9,27 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
 
-class UploadCoroutineTask(
+internal class UploadCoroutineTask(
     private val source: FileDataSource,
     private val storage: FileStorage,
 ) : AbstractCoroutineTask<MockFile>() {
     override suspend fun pull(): List<MockFile> = try {
         source.pull()
     } catch (e: Exception) {
-        cancel()
+        tryCancel()
         emptyList()
     }
 
     override suspend fun handle(element: MockFile): Result = try {
         storage.upload(element)
     } catch (e: IOException) {
-        Result.Retry
+        Result.Retry(3)
     } catch (e: Exception) {
         Result.Failure(e)
     }
 }
 
-fun main(): Unit = runBlocking {
+internal fun main(): Unit = runBlocking {
     val task = UploadCoroutineTask(
         source = MockFileDataSource(),
         storage = MockFileStorage()
@@ -36,10 +37,7 @@ fun main(): Unit = runBlocking {
     launch {
         task.run()
     }
-    task.histories()
-        .map { files -> files.map { it.result } }
-        .onEach {
-            println(it)
-        }
+    task.history()
+        .onEach(::println)
         .launchIn(this)
 }

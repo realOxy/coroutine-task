@@ -1,10 +1,10 @@
 package com.oxy.coroutine.task
 
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * A continuously running task that does not complete automatically.
@@ -15,16 +15,16 @@ import kotlin.time.Duration
  */
 abstract class CoroutineTask<E>(
     protected val pullInterval: Duration,
-    protected val handleInterval: Duration,
-    protected val dispatcher: CoroutineDispatcher,
+    protected val handleInterval: Duration
 ) : CoroutineRunnable, CoroutineCancellable {
     protected abstract suspend fun pull(): List<E>
     protected abstract suspend fun handle(element: E): Result
+    open suspend fun onCompleted() {}
 
     /**
-     * Merged histories about pulling actions with their status.
+     * Merged result about pulling actions.
      */
-    abstract fun histories(): Flow<List<History<E>>>
+    abstract fun history(): Flow<Collection<Result>>
 
     protected var status: Status = Status.Idle
     override val cancelled: Boolean
@@ -40,11 +40,24 @@ abstract class CoroutineTask<E>(
         data object Idle : Result
         data object Success : Result
         data class Failure(val e: Exception) : Result
-        data object Retry : Result
-    }
+        data class Retry(
+            val limit: Int = Int.MAX_VALUE,
+            val strategy: DelayStrategy = DelayStrategy.Stable
+        ) : Result
 
-    data class History<E>(
-        val value: E,
-        val result: Result = Result.Idle
-    )
+        sealed interface DelayStrategy {
+            data object Stable : DelayStrategy
+            data class LinearUniform(val increment: Duration = 1.seconds) : DelayStrategy
+        }
+    }
+}
+
+class RetryOutOfLimitException : RuntimeException()
+
+fun CoroutineTask<*>.tryCancel(cause: CancellationException? = null): Boolean {
+    if (!cancelled) {
+        cancel(cause)
+        return true
+    }
+    return false
 }
