@@ -9,6 +9,6 @@ abstract class PrioritizeCoroutineTask<E>(
     pullInterval: Duration = 1.seconds,
     handleInterval: Duration = 1.seconds,
     dispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
-) : AbstractCoroutineTask<E>(pullInterval, handleInterval, dispatcher) {
+) : AbstractCoroutineTask<E>(pullInterval, handleInterval) {
     abstract fun promote(element: E): Boolean
 }
