@@ -24,7 +24,7 @@ abstract class CoroutineTask<E>(
     /**
      * Merged result about pulling actions.
      */
-    abstract fun history(): Flow<Collection<Result>>
+    abstract fun history(): Flow<History<E>>
 
     protected var status: Status = Status.Idle
     override val cancelled: Boolean
@@ -40,8 +40,9 @@ abstract class CoroutineTask<E>(
         data object Idle : Result
         data object Success : Result
         data class Failure(val e: Exception) : Result
-        data class Retry(
+        data class Retry internal constructor(
             val limit: Int = Int.MAX_VALUE,
+            val retry: Int = 0,
             val strategy: DelayStrategy = DelayStrategy.Stable
         ) : Result
 
@@ -49,8 +50,21 @@ abstract class CoroutineTask<E>(
             data object Stable : DelayStrategy
             data class LinearUniform(val increment: Duration = 1.seconds) : DelayStrategy
         }
+
+        companion object {
+            fun retry(limit: Int = Int.MAX_VALUE, strategy: DelayStrategy = DelayStrategy.Stable): Retry {
+                return Retry(limit, 0, strategy)
+            }
+        }
     }
 }
+
+internal fun CoroutineTask.Result.retry(retry: Int): CoroutineTask.Result {
+    return if (this is CoroutineTask.Result.Retry) this.copy(retry = retry)
+    else this
+}
+
+typealias History<E> = Map<E, CoroutineTask.Result>
 
 class RetryOutOfLimitException : RuntimeException()
 

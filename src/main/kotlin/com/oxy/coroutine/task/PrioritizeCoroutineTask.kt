@@ -19,10 +19,10 @@ abstract class PrioritizeCoroutineTask<E>(
 
     override fun filterHandleable(
         all: List<E>,
-        histories: Histories<E>
+        history: History<E>
     ): List<E> = synchronized(priorities) {
         super
-            .filterHandleable(all, histories)
+            .filterHandleable(all, history)
             .sortedBy { it in priorities }
     }
 }

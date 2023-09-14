@@ -13,9 +13,9 @@ internal class MockFileStorage : FileStorage {
         val random = (0..2).random()
         delay(random.seconds)
         return when (random) {
-            0 -> CoroutineTask.Result.Retry(3)
-            1 -> CoroutineTask.Result.Failure(Exception("Upload Failed"))
-            else -> CoroutineTask.Result.Success
+            else -> CoroutineTask.Result.retry(3)
+//            1 -> CoroutineTask.Result.Failure(Exception("Upload Failed"))
+//            else -> CoroutineTask.Result.Success
         }
     }
 }

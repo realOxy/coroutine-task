@@ -37,6 +37,8 @@ internal fun main(): Unit = runBlocking {
         task.run()
     }
     task.history()
-        .onEach(::println)
+        .onEach { history ->
+            println(history)
+        }
         .launchIn(this)
 }
