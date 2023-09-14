@@ -3,7 +3,6 @@ package com.oxy.coroutine.task.example
 import com.oxy.coroutine.task.AbstractCoroutineTask
 import com.oxy.coroutine.task.tryCancel
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
