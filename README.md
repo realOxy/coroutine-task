@@ -1,6 +1,22 @@
 # CoroutineTask
 > A continuously running task that does not complete automatically.
 
+[![](https://jitpack.io/v/realOxy/coroutine-task.svg)](https://jitpack.io/#realOxy/coroutine-task)
+
+```groovy
+// root build.gradle
+allprojects {
+    repositories {
+        ...
+        maven { url 'https://jitpack.io' }
+    }
+}
+// module build.gradle
+dependencies {
+    implementation "com.github.realOxy:coroutine-task:<version>"
+}
+```
+
 ```kotlin
 import java.io.File
 
