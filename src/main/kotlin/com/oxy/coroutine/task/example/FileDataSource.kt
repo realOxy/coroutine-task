@@ -16,6 +16,8 @@ internal class MockFileDataSource : FileDataSource {
     override suspend fun pull(): List<MockFile> {
         delay((0..1).random().seconds)
         files += Random.nextInt(0..100).toString()
+        files += Random.nextInt(0..100).toString()
+        files += Random.nextInt(0..100).toString()
         return files
     }
 }

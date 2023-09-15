@@ -17,7 +17,7 @@ abstract class CoroutineTask<E>(
     protected val pullInterval: Duration,
     protected val handleInterval: Duration
 ) : CoroutineRunnable, CoroutineCancellable {
-    protected abstract suspend fun pull(): List<E>
+    protected abstract suspend fun pull(): Iterable<E>
     protected abstract suspend fun handle(element: E): Result
     open suspend fun onCompleted() {}
 

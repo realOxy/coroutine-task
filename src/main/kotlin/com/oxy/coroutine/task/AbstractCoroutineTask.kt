@@ -18,7 +18,7 @@ abstract class AbstractCoroutineTask<E>(
     handleInterval: Duration = 1.seconds,
 ) : CoroutineTask<E>(pullInterval, handleInterval) {
 
-    private val flow: MutableStateFlow<History<E>> = MutableStateFlow(emptyMap())
+    protected val flow: MutableStateFlow<History<E>> = MutableStateFlow(emptyMap())
 
     override suspend fun run() = runImpl()
 
@@ -43,13 +43,17 @@ abstract class AbstractCoroutineTask<E>(
             while (!cancelled) {
                 val history = flow.value
                 val all = pull()
+                all.forEach { element ->
+                    if (element !in history) put(element, Result.Idle)
+                }
                 val handleable = filterHandleable(all, history)
-
-                handleable.forEachIndexed { i, e ->
+                val iterator = handleable.iterator()
+                while (iterator.hasNext()) {
+                    val element = iterator.next()
                     if (cancelled) return@launch
-                    var result = handle(e)
+                    var result = handle(element)
                     if (result is Result.Retry) {
-                        rememberHistory(e, result)
+                        put(element, result)
                         var time = 0
                         while (result is Result.Retry && time < result.limit) {
                             time++
@@ -58,9 +62,9 @@ abstract class AbstractCoroutineTask<E>(
                                 is Result.DelayStrategy.LinearUniform -> strategy.increment * time
                             }
                             delay(handleInterval + extraInterval)
-                            result = handle(e).retry(time)
+                            result = handle(element).retry(time)
 
-                            rememberHistory(e, result)
+                            put(element, result)
                         }
 
                         if (result is Result.Retry) {
@@ -68,9 +72,9 @@ abstract class AbstractCoroutineTask<E>(
                         }
                     }
 
-                    rememberHistory(e, result)
+                    put(element, result)
 
-                    if (i != handleable.lastIndex) {
+                    if (iterator.hasNext()) {
                         delay(handleInterval)
                     }
                 }
@@ -82,17 +86,28 @@ abstract class AbstractCoroutineTask<E>(
     }
 
     internal open fun filterHandleable(
-        all: List<E>,
+        all: Iterable<E>,
         history: History<E>
-    ): List<E> = all.filter {
+    ): Iterable<E> = all.filter {
         val result = history[it]
         result == null || result is Result.Idle || result is Result.Retry
     }
 
-    private fun rememberHistory(key: E, value: Result) {
+    protected fun put(key: E, value: Result) {
         flow.update {
             it.toMutableMap().apply {
                 this[key] = value
+            }
+        }
+    }
+
+    protected fun remove(key: E): Result? {
+        while (true) {
+            val expect = flow.value
+            val update = expect.toMutableMap()
+            val result = update.remove(key)
+            if (flow.compareAndSet(expect, update)) {
+                return result
             }
         }
     }

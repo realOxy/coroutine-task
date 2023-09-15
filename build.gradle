@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.oxy"
-version = "1.4"
+version = "1.5"
 
 repositories {
     mavenCentral()
@@ -33,7 +33,7 @@ afterEvaluate {
             maven(MavenPublication) {
                 groupId "com.github.realOxy"
                 artifactId "coroutine-task"
-                version "1.4"
+                version "1.5"
 
                 from components.java
             }
