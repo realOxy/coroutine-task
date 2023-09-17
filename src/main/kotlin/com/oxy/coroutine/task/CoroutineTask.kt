@@ -19,7 +19,6 @@ abstract class CoroutineTask<E>(
 ) : CoroutineRunnable, CoroutineCancellable {
     protected abstract suspend fun pull(): Iterable<E>
     protected abstract suspend fun handle(element: E): Result
-    open suspend fun onCompleted() {}
 
     /**
      * Merged result about pulling actions.
@@ -67,11 +66,3 @@ internal fun CoroutineTask.Result.retry(retry: Int): CoroutineTask.Result {
 typealias History<E> = Map<E, CoroutineTask.Result>
 
 class RetryOutOfLimitException : RuntimeException()
-
-fun CoroutineTask<*>.tryCancel(cause: CancellationException? = null): Boolean {
-    if (!cancelled) {
-        cancel(cause)
-        return true
-    }
-    return false
-}

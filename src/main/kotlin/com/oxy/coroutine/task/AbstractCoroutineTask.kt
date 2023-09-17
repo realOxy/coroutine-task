@@ -29,7 +29,7 @@ abstract class AbstractCoroutineTask<E>(
                     current.job.cancel()
                 }
 
-                is Status.Cancelled -> error("Task has already been cancelled!")
+                is Status.Cancelled -> return
                 else -> {}
             }
             status = Status.Cancelled(cause)
@@ -43,9 +43,6 @@ abstract class AbstractCoroutineTask<E>(
             while (!cancelled) {
                 val history = flow.value
                 val all = pull()
-                all.forEach { element ->
-                    if (element !in history) put(element, Result.Idle)
-                }
                 val handleable = filterHandleable(all, history)
                 val iterator = handleable.iterator()
                 while (iterator.hasNext()) {
@@ -80,7 +77,6 @@ abstract class AbstractCoroutineTask<E>(
                 }
                 delay(pullInterval)
             }
-            onCompleted()
         }
         status = Status.Executing(job)
     }
@@ -102,13 +98,11 @@ abstract class AbstractCoroutineTask<E>(
     }
 
     protected fun remove(key: E): Result? {
-        while (true) {
-            val expect = flow.value
-            val update = expect.toMutableMap()
-            val result = update.remove(key)
-            if (flow.compareAndSet(expect, update)) {
-                return result
+        flow.update {
+            it.toMutableMap().apply {
+                return remove(key)
             }
         }
+        return null
     }
 }
