@@ -20,11 +20,6 @@ abstract class CoroutineTask<E>(
     protected abstract suspend fun pull(): Iterable<E>
     protected abstract suspend fun handle(element: E): Result
 
-    /**
-     * Merged result about pulling actions.
-     */
-    abstract fun history(): Flow<History<E>>
-
     protected var status: Status = Status.Idle
     override val cancelled: Boolean
         get() = status is Status.Cancelled

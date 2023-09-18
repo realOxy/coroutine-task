@@ -1,8 +1,6 @@
 package com.oxy
 
 import com.oxy.coroutine.task.AbstractCoroutineTask
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
@@ -35,9 +33,4 @@ internal fun main(): Unit = runBlocking {
     launch {
         task.run()
     }
-    task.history()
-        .onEach { history ->
-            println(history)
-        }
-        .launchIn(this)
 }

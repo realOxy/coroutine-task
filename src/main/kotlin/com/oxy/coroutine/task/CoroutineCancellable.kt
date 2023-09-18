@@ -6,3 +6,5 @@ interface CoroutineCancellable {
     suspend fun cancel(cause: CancellationException? = null)
     val cancelled: Boolean
 }
+
+internal typealias Cancellation = () -> CancellationException?
