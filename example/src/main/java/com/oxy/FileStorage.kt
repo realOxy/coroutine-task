@@ -1,4 +1,4 @@
-package com.oxy.coroutine.task.example
+package com.oxy
 
 import com.oxy.coroutine.task.CoroutineTask
 import kotlinx.coroutines.delay

@@ -1,4 +1,4 @@
-package com.oxy.coroutine.task.example
+package com.oxy
 
 import com.oxy.coroutine.task.AbstractCoroutineTask
 import kotlinx.coroutines.flow.launchIn
@@ -21,7 +21,7 @@ internal class UploadCoroutineTask(
     override suspend fun handle(element: MockFile): Result = try {
         storage.upload(element)
     } catch (e: IOException) {
-        Result.Retry(3)
+        Result.retry(3)
     } catch (e: Exception) {
         Result.Failure(e)
     }

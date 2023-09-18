@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -22,17 +24,18 @@ abstract class AbstractCoroutineTask<E>(
 
     override suspend fun run() = runImpl()
 
-    override fun cancel(cause: CancellationException?) {
+    override suspend fun cancel(cause: CancellationException?) = suspendCoroutine { continuation ->
         synchronized(status) {
             when (val current = status) {
                 is Status.Executing -> {
                     current.job.cancel()
                 }
 
-                is Status.Cancelled -> return
+                is Status.Cancelled -> continuation.resume(Unit)
                 else -> {}
             }
             status = Status.Cancelled(cause)
+            continuation.resume(Unit)
         }
     }
 
