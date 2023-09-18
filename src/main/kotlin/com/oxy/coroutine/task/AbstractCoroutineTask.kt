@@ -43,13 +43,13 @@ abstract class AbstractCoroutineTask<E>(
 
     override suspend fun cancel(cause: CancellationException?) = suspendCoroutine { continuation ->
         synchronized(status) {
-            when (val current = status) {
-                is Status.Executing -> current.job.cancel()
-                else -> {}
-            }
             invokeOnCancellation {
                 status = Status.Cancelled(cause)
                 continuation.resume(Unit)
+            }
+            when (val current = status) {
+                is Status.Executing -> current.job.cancel()
+                else -> {}
             }
         }
     }
