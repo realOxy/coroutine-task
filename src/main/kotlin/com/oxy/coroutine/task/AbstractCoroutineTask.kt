@@ -97,7 +97,7 @@ abstract class AbstractCoroutineTask<E>(
         }
     }
 
-    internal open fun filterHandleable(
+    open fun filterHandleable(
         all: Iterable<E>,
         history: History<E>
     ): Iterable<E> = all.filter {
