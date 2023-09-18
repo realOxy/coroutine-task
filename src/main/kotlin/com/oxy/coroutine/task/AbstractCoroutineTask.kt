@@ -31,13 +31,15 @@ abstract class AbstractCoroutineTask<E>(
     }
 
     override suspend fun cancel(cause: CancellationException?) = suspendCoroutine { continuation ->
-        invokeOnCancellation {
-            continuation.resume(Unit)
-            cause
-        }
         when (val current = status) {
-            is Status.Executing -> current.job.cancel()
-            else -> {}
+            is Status.Executing -> {
+                invokeOnCancellation {
+                    continuation.resume(Unit)
+                    cause
+                }
+                current.job.cancel()
+            }
+            else -> continuation.resume(Unit)
         }
     }
 
