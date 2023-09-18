@@ -1,12 +1,9 @@
 package com.oxy.coroutine.task
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import kotlin.time.Duration
@@ -15,6 +12,8 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Provides a skeletal implementation of [CoroutineTask] abstract class.
  */
+private typealias Cancellation = () -> Unit
+
 abstract class AbstractCoroutineTask<E>(
     pullInterval: Duration = 1.seconds,
     handleInterval: Duration = 1.seconds,
@@ -22,35 +21,50 @@ abstract class AbstractCoroutineTask<E>(
 
     protected val flow: MutableStateFlow<History<E>> = MutableStateFlow(emptyMap())
 
-    override suspend fun run() = runImpl()
+    override suspend fun run()  {
+        val job = runImpl()
+        job.invokeOnCompletion { throwable ->
+            if (throwable is CancellationException?) {
+                cancellations.forEach { it.invoke() }
+                clearCancellations()
+            }
+        }
+        status = Status.Executing(job)
+    }
+
+    private val cancellations = mutableSetOf<Cancellation>()
+    private fun invokeOnCancellation(cancellation: Cancellation) {
+        cancellations += cancellation
+    }
+
+    private fun clearCancellations() {
+        cancellations.clear()
+    }
 
     override suspend fun cancel(cause: CancellationException?) = suspendCoroutine { continuation ->
         synchronized(status) {
             when (val current = status) {
-                is Status.Executing -> {
-                    current.job.cancel()
-                }
-
-                is Status.Cancelled -> continuation.resume(Unit)
+                is Status.Executing -> current.job.cancel()
                 else -> {}
             }
-            status = Status.Cancelled(cause)
-            continuation.resume(Unit)
+            invokeOnCancellation {
+                status = Status.Cancelled(cause)
+                continuation.resume(Unit)
+            }
         }
     }
 
     override fun history(): Flow<History<E>> = flow
 
-    private suspend fun runImpl() = coroutineScope {
-        val job = launch {
-            while (!cancelled) {
+    private suspend fun runImpl(): Job = coroutineScope {
+        launch {
+            while (true) {
                 val history = flow.value
                 val all = pull()
                 val handleable = filterHandleable(all, history)
                 val iterator = handleable.iterator()
                 while (iterator.hasNext()) {
                     val element = iterator.next()
-                    if (cancelled) return@launch
                     var result = handle(element)
                     if (result is Result.Retry) {
                         put(element, result)
@@ -81,7 +95,6 @@ abstract class AbstractCoroutineTask<E>(
                 delay(pullInterval)
             }
         }
-        status = Status.Executing(job)
     }
 
     internal open fun filterHandleable(
