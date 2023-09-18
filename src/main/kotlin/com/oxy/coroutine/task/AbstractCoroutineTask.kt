@@ -21,15 +21,17 @@ abstract class AbstractCoroutineTask<E>(
 
     protected val flow: MutableStateFlow<History<E>> = MutableStateFlow(emptyMap())
 
-    override suspend fun run()  {
+    override suspend fun run(): Unit = coroutineScope {
         val job = runImpl()
-        job.invokeOnCompletion { throwable ->
-            if (throwable is CancellationException?) {
-                cancellations.forEach { it.invoke() }
-                clearCancellations()
+        launch {
+            job.invokeOnCompletion { throwable ->
+                if (throwable is CancellationException?) {
+                    cancellations.forEach { it.invoke() }
+                    clearCancellations()
+                }
             }
+            status = Status.Executing(job)
         }
-        status = Status.Executing(job)
     }
 
     private val cancellations = mutableSetOf<Cancellation>()
@@ -56,44 +58,42 @@ abstract class AbstractCoroutineTask<E>(
 
     override fun history(): Flow<History<E>> = flow
 
-    private suspend fun runImpl(): Job = coroutineScope {
-        launch {
-            while (true) {
-                val history = flow.value
-                val all = pull()
-                val handleable = filterHandleable(all, history)
-                val iterator = handleable.iterator()
-                while (iterator.hasNext()) {
-                    val element = iterator.next()
-                    var result = handle(element)
-                    if (result is Result.Retry) {
+    private fun CoroutineScope.runImpl(): Job = launch {
+        while (true) {
+            val history = flow.value
+            val all = pull()
+            val handleable = filterHandleable(all, history)
+            val iterator = handleable.iterator()
+            while (iterator.hasNext()) {
+                val element = iterator.next()
+                var result = handle(element)
+                if (result is Result.Retry) {
+                    put(element, result)
+                    var time = 0
+                    while (result is Result.Retry && time < result.limit) {
+                        time++
+                        val extraInterval = when (val strategy = result.strategy) {
+                            Result.DelayStrategy.Stable -> Duration.ZERO
+                            is Result.DelayStrategy.LinearUniform -> strategy.increment * time
+                        }
+                        delay(handleInterval + extraInterval)
+                        result = handle(element).retry(time)
+
                         put(element, result)
-                        var time = 0
-                        while (result is Result.Retry && time < result.limit) {
-                            time++
-                            val extraInterval = when (val strategy = result.strategy) {
-                                Result.DelayStrategy.Stable -> Duration.ZERO
-                                is Result.DelayStrategy.LinearUniform -> strategy.increment * time
-                            }
-                            delay(handleInterval + extraInterval)
-                            result = handle(element).retry(time)
-
-                            put(element, result)
-                        }
-
-                        if (result is Result.Retry) {
-                            result = Result.Failure(RetryOutOfLimitException())
-                        }
                     }
 
-                    put(element, result)
-
-                    if (iterator.hasNext()) {
-                        delay(handleInterval)
+                    if (result is Result.Retry) {
+                        result = Result.Failure(RetryOutOfLimitException())
                     }
                 }
-                delay(pullInterval)
+
+                put(element, result)
+
+                if (iterator.hasNext()) {
+                    delay(handleInterval)
+                }
             }
+            delay(pullInterval)
         }
     }
 
