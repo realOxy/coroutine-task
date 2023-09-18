@@ -58,6 +58,11 @@ abstract class CoroutineTask<E>(
     }
 }
 
+suspend fun CoroutineTask<*>.reboot() {
+    cancel()
+    run()
+}
+
 internal fun CoroutineTask.Result.retry(retry: Int): CoroutineTask.Result {
     return if (this is CoroutineTask.Result.Retry) this.copy(retry = retry)
     else this
