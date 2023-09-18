@@ -15,12 +15,11 @@ abstract class AbstractCoroutineTask<E>(
 ) : CoroutineTask<E>(pullInterval, handleInterval) {
 
     override suspend fun run(): Unit = coroutineScope {
-        val job = launch {
-            launch { runImpl() }.invokeOnCompletion { throwable ->
-                if (throwable is CancellationException?) {
-                    status = Status.Cancelled(cancellation?.invoke())
-                    cancellation = null
-                }
+        val job = runImpl()
+        job.invokeOnCompletion { throwable ->
+            if (throwable is CancellationException?) {
+                status = Status.Cancelled(cancellation?.invoke())
+                cancellation = null
             }
         }
         status = Status.Executing(job)
