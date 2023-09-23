@@ -17,6 +17,8 @@ dependencies {
 }
 ```
 
+Documention below is out of date, please visit [example](example/src/main/java/com/oxy/UploadCoroutineTask.kt).
+
 ```kotlin
 import java.io.File
 
